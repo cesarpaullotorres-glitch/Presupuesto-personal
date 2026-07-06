@@ -1,0 +1,710 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Presupuesto Personal</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#0f172a">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Presupuesto">
+    <meta name="application-name" content="Presupuesto Personal">
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="logo.png">
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database-compat.js"></script>
+    <style>
+        :root {
+            --bg:#0f172a; --surface:#1e293b; --border:#334155;
+            --accent:#facc15; --green:#10b981; --red:#ef4444;
+            --blue:#38bdf8; --muted:#94a3b8; --text:#f1f5f9;
+            --r:8px; --rL:12px;
+        }
+        *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+        html,body{height:100%;font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);font-size:16px;}
+
+        /* SPLASH */
+        #splash-screen{position:fixed;inset:0;background:linear-gradient(160deg,#0f172a 0%,#1e1b4b 100%);display:flex;flex-direction:column;justify-content:center;align-items:center;gap:8px;z-index:1000;transition:opacity .7s ease;}
+        #splash-screen.oculto{opacity:0;pointer-events:none;}
+        .splash-logo{width:120px;height:120px;border-radius:28px;background:linear-gradient(135deg,#1e293b,#0f172a);border:3px solid var(--accent);box-shadow:0 8px 32px rgba(250,204,21,.25);display:flex;align-items:center;justify-content:center;font-size:3.2rem;margin-bottom:12px;}
+        #splash-screen h1{color:var(--accent);font-size:1.7rem;font-weight:900;letter-spacing:.04em;text-align:center;}
+        #splash-screen .splash-sub{color:rgba(255,255,255,.45);font-size:.72rem;letter-spacing:.18em;text-transform:uppercase;margin-top:6px;}
+
+        /* LAYOUT */
+        .app-wrapper{max-width:480px;margin:auto;padding:16px 16px 80px;}
+        h1{color:var(--accent);text-align:center;margin-bottom:4px;font-size:1.5rem;}
+        .subtitulo-app{text-align:center;color:var(--muted);font-size:.85rem;margin-bottom:18px;}
+
+        /* TABS */
+        .tabs{display:flex;gap:5px;margin-bottom:18px;flex-wrap:wrap;}
+        .tab-btn{flex:1;min-width:90px;padding:10px 6px;background:var(--border);border:none;color:var(--text);cursor:pointer;border-radius:var(--r);font-weight:700;font-size:.78rem;transition:background .15s;}
+        .tab-btn.active{background:var(--accent);color:#0f172a;}
+        .content{display:none;} .content.active{display:block;}
+
+        /* CARDS */
+        .card{background:var(--surface);padding:14px;border-radius:var(--rL);margin-bottom:14px;border:1px solid var(--border);position:relative;}
+
+        /* FORMS */
+        input,select{width:100%;padding:11px 12px;margin-bottom:10px;border-radius:var(--r);border:1px solid var(--border);background:var(--bg);color:var(--text);font-family:inherit;font-size:15px;box-sizing:border-box;}
+        input:focus,select:focus{outline:2px solid var(--accent);border-color:var(--accent);}
+        .label-fecha{font-size:.82rem;color:var(--muted);display:block;margin-bottom:4px;font-weight:700;}
+
+        /* BOTONES */
+        .btn-add{background:var(--green);color:white;border:none;padding:12px;width:100%;border-radius:var(--r);cursor:pointer;font-weight:700;font-size:1rem;transition:filter .15s;}
+        .btn-add:hover{filter:brightness(1.1);}
+        .btn-del{background:var(--red);color:white;border:none;padding:4px 10px;border-radius:6px;cursor:pointer;font-weight:700;font-size:.8rem;}
+        .btn-del-historial{background:var(--red);color:white;border:none;padding:2px 7px;border-radius:4px;cursor:pointer;font-size:.75rem;margin-left:6px;flex-shrink:0;}
+        .btn-plan{background:#4f46e5;color:white;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:.8rem;font-weight:700;}
+        .btn-plan.active{background:var(--accent);color:#0f172a;}
+        .btn-mantenimiento{background:#991b1b;color:white;border:1px dashed var(--red);padding:10px;width:100%;border-radius:var(--r);cursor:pointer;font-weight:700;font-size:.85rem;margin-top:14px;}
+        .btn-reiniciar{background:var(--surface);color:var(--red);border:2px dashed var(--red);padding:12px;width:100%;border-radius:var(--r);cursor:pointer;font-weight:700;font-size:.88rem;margin-top:8px;transition:background .15s;}
+        .btn-reiniciar:hover{background:#7f1d1d;color:white;}
+        .btn-reiniciar.amber{border-color:#f59e0b;color:#f59e0b;}
+        .btn-reiniciar.amber:hover{background:#78350f;color:white;}
+
+        /* SUGERENCIAS */
+        .sugerencias-box{position:absolute;top:88px;left:14px;right:14px;background:var(--surface);border:2px solid var(--accent);border-radius:var(--r);z-index:100;max-height:150px;overflow-y:auto;display:none;}
+        .sugerencia-item{padding:11px;color:var(--text);border-bottom:1px solid var(--border);cursor:pointer;display:flex;justify-content:space-between;font-size:.87rem;}
+        .sugerencia-item:hover{background:var(--border);}
+
+        /* LISTAS */
+        ul{list-style:none;padding:0;margin:0;}
+        li{display:flex;justify-content:space-between;padding:8px 0;align-items:center;border-bottom:1px solid var(--border);}
+
+        /* HISTORIAL */
+        .mes-item{background:var(--border);padding:12px;margin-bottom:6px;border-radius:var(--r);cursor:pointer;font-weight:700;border-left:4px solid var(--accent);font-size:.92rem;}
+        .dia-item{background:#475569;padding:10px;margin:5px 0 5px 16px;border-radius:6px;font-size:.88rem;display:flex;justify-content:space-between;align-items:center;}
+        .dia-header-click{flex-grow:1;display:flex;justify-content:space-between;align-items:center;cursor:pointer;}
+        .detalle{display:none;padding:10px;background:var(--surface);font-size:.88rem;margin-top:4px;border-radius:6px;width:100%;box-sizing:border-box;}
+
+        /* SALDO */
+        .box-saldo{padding:14px;border-radius:10px;text-align:center;margin-top:14px;font-size:1.1rem;font-weight:700;}
+        .saldo-positivo{background:#064e3b;color:#34d399;border:1px solid #059669;}
+        .saldo-negativo{background:#7f1d1d;color:#fca5a5;border:1px solid var(--red);}
+        .cierre-resumen-box{background:var(--bg);padding:10px;border-radius:6px;margin-top:8px;font-size:.83rem;border-top:2px solid var(--accent);color:#e2e8f0;}
+
+        /* PLAN */
+        .box-plan{background:#1e1b4b;border:1px solid #6366f1;padding:14px;border-radius:var(--rL);margin-top:14px;}
+        .recomendacion-texto{background:var(--bg);padding:10px;border-radius:var(--r);margin-top:10px;font-size:.83rem;border-left:3px solid var(--accent);line-height:1.5;}
+        .alerta-estrategica{background:#450a0a;border-left:4px solid var(--red);padding:8px;border-radius:4px;margin-top:8px;color:#fca5a5;font-size:.8rem;}
+        .exito-estrategico{background:#062f21;border-left:4px solid var(--green);padding:8px;border-radius:4px;margin-top:8px;color:#a7f3d0;font-size:.8rem;}
+
+        /* DEUDAS */
+        .deuda-item{background:var(--surface);padding:12px;border-radius:var(--r);margin-bottom:8px;border-left:4px solid var(--blue);}
+        .deuda-header{display:flex;justify-content:space-between;align-items:center;}
+
+        /* DESBALANCE */
+        .box-alerta-desbalance{padding:10px;border-radius:var(--r);font-size:.83rem;margin-top:10px;font-weight:700;border-left:4px solid;}
+        .desbalance-ok{background:var(--surface);color:var(--blue);border-left-color:var(--blue);}
+        .desbalance-alerta{background:#7f1d1d;color:#fca5a5;border-left-color:var(--red);}
+
+        /* BANDA */
+        .box-auditoria-banda{background:var(--surface);border:2px dashed var(--blue);padding:12px;border-radius:10px;margin-top:14px;font-size:.88rem;}
+
+        /* BOX ANUAL */
+        .box-anual{background:var(--surface);border:2px double var(--accent);padding:14px;border-radius:var(--rL);margin-top:22px;text-align:center;font-size:.95rem;}
+
+        /* TOAST */
+        #toast{position:fixed;bottom:28px;left:50%;transform:translateX(-50%);background:var(--green);color:white;padding:10px 22px;border-radius:20px;font-weight:700;font-size:.88rem;z-index:9999;display:none;box-shadow:0 4px 14px rgba(0,0,0,.4);}
+        #toast.error{background:var(--red);}
+
+        /* SYNC */
+        #estado-sync{text-align:center;font-size:.72rem;color:#475569;margin-bottom:6px;}
+
+        /* ZONA PELIGRO */
+        .zona-peligro{border:2px dashed var(--red);border-radius:var(--rL);padding:14px;margin-top:28px;}
+        .zona-peligro h3{color:var(--red);font-size:.95rem;margin-bottom:6px;}
+        .zona-peligro p{font-size:.8rem;color:var(--muted);margin-bottom:10px;}
+    </style>
+</head>
+<body>
+
+<!-- SPLASH -->
+<div id="splash-screen">
+    <div class="splash-logo">💰</div>
+    <h1>Presupuesto<br>Personal</h1>
+    <span class="splash-sub">Control financiero inteligente</span>
+</div>
+
+<div id="toast"></div>
+
+<div class="app-wrapper">
+    <div id="estado-sync">🔄 Conectando...</div>
+    <h1>Presupuesto Personal</h1>
+    <div id="fecha-hoy" class="subtitulo-app"></div>
+
+    <div class="tabs">
+        <button class="tab-btn active" onclick="mostrarTab('ingresos',this)">💰 Ingresos</button>
+        <button class="tab-btn" onclick="mostrarTab('gastos',this)">📉 Gastos</button>
+        <button class="tab-btn" onclick="mostrarTab('deudas',this)">👥 Deudas</button>
+        <button class="tab-btn" onclick="mostrarTab('servicios',this)">🏠 Servicios</button>
+    </div>
+
+    <!-- TAB INGRESOS -->
+    <div id="tab-ingresos" class="content active">
+        <div class="card">
+            <label class="label-fecha">✏️ Detalle del ingreso:</label>
+            <input type="text" id="nombre-ingreso" placeholder="¿De dónde vino el dinero?">
+            <label class="label-fecha">🏷️ Origen:</label>
+            <select id="select-categoria-ingreso">
+                <option value="Calle">🚌 Calle (Ingreso Diario / Ruta)</option>
+                <option value="Colegio Túpac Amaru">🏫 Colegio Túpac Amaru</option>
+                <option value="La Revelación del Callao">🎺 Banda Orquesta La Revelación</option>
+                <option value="TLC Music Academia">🧠 TLC Music Academia</option>
+                <option value="Trombón Sweet">🎵 Trombón Sweet</option>
+                <option value="Otros">📦 Otros Ingresos</option>
+            </select>
+            <label class="label-fecha">💵 Monto (S/):</label>
+            <input type="number" step="0.01" id="precio-ingreso" placeholder="0.00">
+            <label class="label-fecha">Asignar al día:</label>
+            <select id="select-fecha-ingreso" class="select-fecha-dinamico"></select>
+            <button class="btn-add" onclick="agregarTransaccion('ingresos')">Registrar ingreso</button>
+        </div>
+        <ul id="lista-ingresos-hoy"></ul>
+        <div style="text-align:center;margin-top:18px;font-size:1.4rem;color:var(--green);font-weight:700;">
+            Total Ingresos Hoy: S/ <span id="total-ingresos-diario">0.00</span>
+        </div>
+        <div class="box-auditoria-banda">
+            <h4 style="margin:0 0 8px 0;color:var(--blue);font-size:.92rem;">🎺 Monitor Contratos Acumulados</h4>
+            <div style="line-height:1.5;font-size:.83rem;">
+                • Adelantos Totales: <b style="color:var(--blue);">S/ <span id="banda-total-hoy">0.00</span></b><br>
+                • 💰 Tu Ganancia (30%): <b>S/ <span id="banda-ganancia-hoy">0.00</span></b><br>
+                • 👥 Fondo Músicos (70%): <b style="color:var(--red);">S/ <span id="banda-musicos-hoy">0.00</span></b>
+            </div>
+        </div>
+        <div class="card" style="margin-top:14px;border:1px dashed var(--green);">
+            <h4 style="margin:0 0 8px 0;color:var(--green);font-size:.92rem;">📊 Acumulado por Origen (Mes Actual)</h4>
+            <div id="desglose-ingresos-categorias" style="font-size:.83rem;line-height:1.6;"></div>
+        </div>
+        <h2 style="font-size:1.1rem;margin-top:26px;color:var(--green);border-bottom:1px solid var(--border);padding-bottom:5px;">Historial de Ingresos</h2>
+        <div id="contenedor-historial-ingresos"></div>
+        <div id="total-anual-ingresos-box" class="box-anual" style="color:var(--green);"></div>
+    </div>
+
+    <!-- TAB GASTOS -->
+    <div id="tab-gastos" class="content">
+        <div class="card" style="border:1px solid var(--accent);">
+            <label class="label-fecha" style="color:var(--accent);">💰 Caja Chica (Arrastre automático):</label>
+            <input type="number" step="0.01" id="saldo-inicial-manual" placeholder="S/ 0.00" oninput="guardarSaldoManual()" style="font-size:1.1rem;font-weight:700;color:var(--accent);">
+        </div>
+        <div class="card">
+            <label class="label-fecha">✏️ Detalle del gasto:</label>
+            <input type="text" id="nombre-gasto" placeholder="Ej: Pan, pasajes..." oninput="buscarSugerencias(this.value)" autocomplete="off">
+            <div id="box-sugerencias-gasto" class="sugerencias-box"></div>
+            <label class="label-fecha">🏷️ Categoría:</label>
+            <select id="select-categoria-gasto">
+                <option value="Alimento">🍎 Alimento</option>
+                <option value="Ajuste por desbalance">⚖️ Ajuste por desbalance</option>
+                <option value="Gaseosas">🥤 Control Gaseosas/Azúcar</option>
+                <option value="Transporte">🚌 Transporte</option>
+                <option value="Aseo y Limpieza">🧼 Aseo y Limpieza</option>
+                <option value="Servicios">⚡ Servicios Fijos</option>
+                <option value="Salud">💊 Salud</option>
+                <option value="Ropa">👕 Ropa y Calzado</option>
+                <option value="Gustitos">☕ Gustitos</option>
+                <option value="Otros">📦 Otros</option>
+            </select>
+            <label class="label-fecha">💵 Monto (S/):</label>
+            <input type="number" step="0.01" id="precio-gasto" placeholder="0.00">
+            <label class="label-fecha">Asignar al día:</label>
+            <select id="select-fecha-gasto" class="select-fecha-dinamico"></select>
+            <button class="btn-add" onclick="agregarTransaccion('gastos')">Agregar gasto</button>
+        </div>
+        <ul id="lista-hoy"></ul>
+        <div style="text-align:center;margin-top:14px;font-size:1.3rem;color:var(--red);font-weight:700;">
+            Total Gastos Hoy: S/ <span id="total-diario">0.00</span>
+        </div>
+        <div id="control-saldo-acumulado" class="box-saldo"></div>
+        <div id="box-alerta-desbalance-panel" class="box-alerta-desbalance desbalance-ok"></div>
+        <div id="alerta-blindaje-banda"></div>
+        <div class="box-plan">
+            <h3 style="margin-top:0;color:var(--accent);font-size:1.05rem;">🎯 Plan de Costo de Vida</h3>
+            <p style="font-size:.78rem;color:var(--muted);margin-top:-4px;">Proyectado en base a tus registros reales.</p>
+            <div style="display:flex;gap:5px;margin-bottom:10px;">
+                <button class="btn-plan active" id="btn-p30" onclick="cambiarPlazoPlan(30)">30 d</button>
+                <button class="btn-plan" id="btn-p60" onclick="cambiarPlazoPlan(60)">60 d</button>
+                <button class="btn-plan" id="btn-p90" onclick="cambiarPlazoPlan(90)">90 d</button>
+                <button class="btn-plan" id="btn-p120" onclick="cambiarPlazoPlan(120)">120 d</button>
+            </div>
+            <div id="analisis-estrategico" class="recomendacion-texto">Calculando tendencias...</div>
+            <div id="recomendacion-ingreso-real"></div>
+        </div>
+        <h2 style="font-size:1.1rem;margin-top:26px;color:var(--red);border-bottom:1px solid var(--border);padding-bottom:5px;">Historial de Gastos</h2>
+        <div id="contenedor-historial"></div>
+        <div id="total-anual-gastos-box" class="box-anual" style="color:var(--red);"></div>
+    </div>
+
+    <!-- TAB DEUDAS -->
+    <div id="tab-deudas" class="content">
+        <div class="card">
+            <h3 style="margin-top:0;color:var(--blue);font-size:1.05rem;">✍️ Registrar Préstamo</h3>
+            <input type="text" id="nombre-deuda" placeholder="Nombre (Ej: Préstamo Chepe)">
+            <input type="number" step="0.01" id="monto-deuda" placeholder="Capital Inicial (S/)">
+            <input type="number" step="0.1" id="interes-deuda" placeholder="Interés Mensual (%) - Ej: 20">
+            <button class="btn-add" style="background:var(--blue);color:#0f172a;" onclick="agregarDeuda()">Registrar Deuda</button>
+        </div>
+        <h2 style="font-size:1.1rem;margin-top:18px;color:var(--blue);border-bottom:1px solid var(--border);padding-bottom:5px;">Tus Deudas</h2>
+        <div id="lista-deudas"></div>
+    </div>
+
+    <!-- TAB SERVICIOS -->
+    <div id="tab-servicios" class="content">
+        <div class="card">
+            <input type="text" id="nombre-servicio" placeholder="Nombre (Ej: Agua, Luz)">
+            <input type="number" step="0.01" id="precio-servicio" placeholder="Monto Mensual (S/)">
+            <button class="btn-add" onclick="agregarServicio()">Registrar Servicio</button>
+        </div>
+        <ul id="lista-servicios"></ul>
+        <button class="btn-mantenimiento" onclick="limpiarDiasEspecificos()">⚙️ Limpiar Días (Vie-Sáb-Dom)</button>
+        <div class="zona-peligro">
+            <h3>⚠️ Zona de Reinicio</h3>
+            <p>Estas acciones eliminan datos permanentemente de Firebase y no se pueden deshacer.</p>
+            <button class="btn-reiniciar" onclick="reiniciarTodo()">🗑️ Reiniciar TODO (ingresos, gastos, deudas y servicios)</button>
+            <button class="btn-reiniciar amber" onclick="reiniciarSoloMovimientos()">📋 Reiniciar solo movimientos (conservar deudas y servicios)</button>
+        </div>
+    </div>
+</div>
+
+<script>
+// ── FIREBASE ──
+const firebaseConfig = {
+    apiKey:"AIzaSySyBhf6dRmAzRjORmGLKnJHfzelt01I",
+    authDomain:"presupuestopararevelacion.firebaseapp.com",
+    databaseURL:"https://presupuestopararevelacion-default-rtdb.firebaseio.com",
+    projectId:"presupuestopararevelacion",
+    storageBucket:"presupuestopararevelacion.appspot.com",
+    messagingSenderId:"55951143914",
+    appId:"1:55951143914:web:ea7edb2e8a55c8d331"
+};
+firebase.initializeApp(firebaseConfig);
+const db  = firebase.database();
+const ref = db.ref('app_presupuesto_personal');
+
+// ── ESTADO ──
+let estado = { ingresos:{}, gastos:{}, saldos:{}, deudas:[], servicios:[] };
+
+// ── BANDERA CRÍTICA: bloquea guardar hasta que Firebase responda ──
+let datosListos = false;
+
+// ── CONSTANTES ──
+let plazoPlanSeleccionado = 30;
+const TOPE_DESBALANCE = 20.00;
+const hoy = new Date().toLocaleDateString('es-PE',{day:'2-digit',month:'2-digit',year:'numeric'});
+
+// ── UTILIDADES ──
+function esc(s){return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
+function toast(msg,tipo='ok'){const t=document.getElementById('toast');t.textContent=msg;t.className=tipo==='error'?'error':'';t.style.display='block';setTimeout(()=>t.style.display='none',2500);}
+function setSync(msg){const el=document.getElementById('estado-sync');if(el)el.textContent=msg;}
+function getDiaSemana(f){if(!f)return'';const[d,m,a]=f.split('/');return new Date(a,m-1,d).toLocaleDateString('es-PE',{weekday:'short'}).replace('.','');}
+function reconstruirFecha(f){const[d,m,a]=f.split('/');return new Date(a,m-1,d);}
+function toggle(id){const el=document.getElementById(id);if(el)el.style.display=el.style.display==='block'?'none':'block';}
+
+// ── FIREBASE: CARGAR ──
+function cargarFirebase(){
+    setSync('🔄 Conectando...');
+    ref.on('value', snap => {
+        const d = snap.val();
+        // Cargamos lo que hay (o vacío si es null) — NUNCA pisamos con el estado inicial vacío
+        estado.ingresos  = (d&&d.ingresos)  ? d.ingresos  : {};
+        estado.gastos    = (d&&d.gastos)    ? d.gastos    : {};
+        estado.saldos    = (d&&d.saldos)    ? d.saldos    : {};
+        estado.deudas    = (d&&d.deudas)    ? d.deudas    : [];
+        estado.servicios = (d&&d.servicios) ? d.servicios : [];
+        // ── Recién aquí se habilita el guardado ──
+        datosListos = true;
+        setSync('✅ Sincronizado');
+        ocultarSplash();
+        renderizarTodo();
+    }, () => {
+        setSync('❌ Sin conexión');
+        ocultarSplash();
+        toast('Sin conexión a Firebase','error');
+    });
+}
+
+// ── FIREBASE: GUARDAR ──
+async function guardarFirebase(){
+    if(!datosListos) return; // protección principal
+    try{
+        await ref.set(estado);
+        setSync('✅ Sincronizado');
+    }catch(e){
+        setSync('❌ Error al guardar');
+        toast('Error: '+e.message,'error');
+    }
+}
+
+// ── SPLASH ──
+function ocultarSplash(){
+    const s=document.getElementById('splash-screen');
+    if(s&&!s.classList.contains('oculto')){s.classList.add('oculto');setTimeout(()=>s.style.display='none',700);}
+}
+
+// ── TABS ──
+function mostrarTab(tab,btn){
+    document.querySelectorAll('.content').forEach(c=>c.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+    document.getElementById('tab-'+tab).classList.add('active');
+    if(btn)btn.classList.add('active');
+}
+
+// ── SELECTORES FECHA ──
+function inicializarSelectoresFecha(){
+    const partes=[];
+    for(let i=0;i<=5;i++){
+        const d=new Date();d.setDate(d.getDate()-i);
+        const f=d.toLocaleDateString('es-PE',{day:'2-digit',month:'2-digit',year:'numeric'});
+        partes.push(`<option value="${f}">${i===0?'Hoy':f}</option>`);
+    }
+    document.querySelectorAll('.select-fecha-dinamico').forEach(s=>{s.innerHTML=partes.join('');s.value=hoy;});
+}
+
+// ── SALDO MANUAL ──
+function guardarSaldoManual(){
+    if(!datosListos)return;
+    const val=parseFloat(document.getElementById('saldo-inicial-manual').value)||0;
+    estado.saldos[hoy]=val;
+    guardarFirebase();
+    calcularSaldoAcumulado();
+}
+
+// ── RECÁLCULO ARRASTRE ──
+function ejecutarRecalculoGeneral(){
+    const fs=new Set([hoy]);
+    Object.keys(estado.gastos).forEach(f=>fs.add(f));
+    Object.keys(estado.ingresos).forEach(f=>fs.add(f));
+    Object.keys(estado.saldos).forEach(f=>fs.add(f));
+    const ord=Array.from(fs).filter(f=>f.includes('/')).sort((a,b)=>reconstruirFecha(a)-reconstruirFecha(b));
+    let arr=0,primero=true;
+    ord.forEach(f=>{
+        const i=(estado.ingresos[f]||[]).reduce((s,x)=>s+x.precio,0);
+        const g=(estado.gastos[f]||[]).reduce((s,x)=>s+x.precio,0);
+        if(primero){arr=estado.saldos[f]!==undefined?estado.saldos[f]:0;primero=false;}
+        else{estado.saldos[f]=arr;}
+        arr=arr+i-g;
+    });
+    return estado.saldos[hoy]!==undefined?estado.saldos[hoy]:arr;
+}
+
+// ── TRANSACCIONES ──
+function agregarTransaccion(tipo){
+    if(!datosListos){toast('Esperando conexión...','error');return;}
+    const esIng=tipo==='ingresos';
+    const nombre=document.getElementById(esIng?'nombre-ingreso':'nombre-gasto').value.trim();
+    const categoria=document.getElementById(esIng?'select-categoria-ingreso':'select-categoria-gasto').value;
+    const precio=parseFloat(document.getElementById(esIng?'precio-ingreso':'precio-gasto').value);
+    const fecha=document.getElementById(esIng?'select-fecha-ingreso':'select-fecha-gasto').value;
+    if(!nombre||isNaN(precio)||precio<=0){toast('Completá nombre y monto','error');return;}
+    if(!estado[tipo][fecha])estado[tipo][fecha]=[];
+    estado[tipo][fecha].push({nombre,precio,categoria});
+    document.getElementById(esIng?'nombre-ingreso':'nombre-gasto').value='';
+    document.getElementById(esIng?'precio-ingreso':'precio-gasto').value='';
+    guardarFirebase();calcularSaldoAcumulado();renderizarSeccion(tipo);
+    toast('✅ Registrado');
+}
+
+function borrarTransaccion(tipo,fecha,index){
+    if(!datosListos)return;
+    if(!estado[tipo][fecha])return;
+    estado[tipo][fecha].splice(index,1);
+    if(!estado[tipo][fecha].length)delete estado[tipo][fecha];
+    guardarFirebase();calcularSaldoAcumulado();renderizarSeccion(tipo);
+}
+
+// ── DEUDAS ──
+function agregarDeuda(){
+    if(!datosListos)return;
+    const nombre=document.getElementById('nombre-deuda').value.trim();
+    const monto=parseFloat(document.getElementById('monto-deuda').value);
+    const interes=parseFloat(document.getElementById('interes-deuda').value)||0;
+    if(!nombre||isNaN(monto)){toast('Completá nombre y monto','error');return;}
+    estado.deudas.push({nombre,monto,interes});
+    document.getElementById('nombre-deuda').value='';
+    document.getElementById('monto-deuda').value='';
+    document.getElementById('interes-deuda').value='';
+    guardarFirebase();renderDeudas();calcularSaldoAcumulado();toast('✅ Deuda registrada');
+}
+function borrarDeuda(i){estado.deudas.splice(i,1);guardarFirebase();renderDeudas();calcularSaldoAcumulado();}
+function renderDeudas(){
+    const cont=document.getElementById('lista-deudas');if(!cont)return;
+    if(!estado.deudas.length){cont.innerHTML='<p style="color:var(--muted);font-size:.83rem;">No hay deudas registradas.</p>';return;}
+    cont.innerHTML=estado.deudas.map((it,i)=>{
+        const intM=it.monto*(it.interes/100);
+        return`<div class="deuda-item"><div class="deuda-header">
+            <span><b>${esc(it.nombre)}</b><br>Capital: S/ ${it.monto.toFixed(2)} | ${it.interes}% → S/ ${intM.toFixed(2)}</span>
+            <button class="btn-del" onclick="borrarDeuda(${i})">X</button>
+        </div></div>`;
+    }).join('');
+}
+
+// ── SERVICIOS ──
+function agregarServicio(){
+    if(!datosListos)return;
+    const nombre=document.getElementById('nombre-servicio').value.trim();
+    const valor=parseFloat(document.getElementById('precio-servicio').value);
+    if(!nombre||isNaN(valor)){toast('Completá nombre y monto','error');return;}
+    estado.servicios.push({nombre,valor});
+    document.getElementById('nombre-servicio').value='';
+    document.getElementById('precio-servicio').value='';
+    guardarFirebase();renderServicios();calcularSaldoAcumulado();toast('✅ Servicio registrado');
+}
+function borrarServicio(i){estado.servicios.splice(i,1);guardarFirebase();renderServicios();calcularSaldoAcumulado();}
+function renderServicios(){
+    const cont=document.getElementById('lista-servicios');if(!cont)return;
+    if(!estado.servicios.length){cont.innerHTML='<li style="color:var(--muted);font-size:.83rem;">No hay servicios registrados.</li>';return;}
+    cont.innerHTML=estado.servicios.map((it,i)=>
+        `<li><span>${esc(it.nombre)} — <b>S/ ${parseFloat(it.valor).toFixed(2)}/mes</b></span>
+         <button class="btn-del" onclick="borrarServicio(${i})">X</button></li>`
+    ).join('');
+}
+
+// ── REINICIO ──
+async function reiniciarTodo(){
+    if(!confirm('⚠️ ¿Borrar TODO? Ingresos, gastos, deudas y servicios.\nNo se puede deshacer.'))return;
+    if(!confirm('🔴 Confirmación final: ¿Estás completamente seguro?'))return;
+    estado={ingresos:{},gastos:{},saldos:{},deudas:[],servicios:[]};
+    await guardarFirebase();renderizarTodo();toast('✅ Todo reiniciado');
+}
+async function reiniciarSoloMovimientos(){
+    if(!confirm('⚠️ ¿Borrar todos los ingresos y gastos?\nLas deudas y servicios se conservan.'))return;
+    estado.ingresos={};estado.gastos={};estado.saldos={};
+    await guardarFirebase();calcularSaldoAcumulado();
+    renderizarSeccion('ingresos');renderizarSeccion('gastos');
+    toast('✅ Movimientos reiniciados');
+}
+
+// ── SALDO ACUMULADO ──
+function calcularSaldoAcumulado(){
+    const saldoIni=ejecutarRecalculoGeneral();
+    const ingHoy=(estado.ingresos[hoy]||[]).reduce((s,x)=>s+x.precio,0);
+    const gasHoy=(estado.gastos[hoy]||[]).reduce((s,x)=>s+x.precio,0);
+    const efectivo=(saldoIni+ingHoy)-gasHoy;
+    const cont=document.getElementById('control-saldo-acumulado');
+    if(cont){
+        cont.className=efectivo>=0?'box-saldo saldo-positivo':'box-saldo saldo-negativo';
+        cont.innerHTML=efectivo>=0?`Efectivo real en mano: <b>S/ ${efectivo.toFixed(2)}</b>`:`🚨 En Rojo por S/ ${Math.abs(efectivo).toFixed(2)}`;
+    }
+    const elSI=document.getElementById('saldo-inicial-manual');
+    if(elSI)elSI.value=saldoIni.toFixed(2);
+    let totalBanda=0;
+    Object.values(estado.ingresos).forEach(l=>(l||[]).forEach(ing=>{if(ing.categoria==='La Revelación del Callao')totalBanda+=ing.precio;}));
+    const fondoMus=totalBanda*0.70;
+    const boxB=document.getElementById('alerta-blindaje-banda');
+    if(boxB){
+        boxB.innerHTML=totalBanda>0?(efectivo>=fondoMus
+            ?`<div class="exito-estrategico" style="background:#134e5e;border-left-color:var(--blue);">🛡️ <b>Blindaje Activo:</b> Fondo músicos (S/ ${fondoMus.toFixed(2)}) intacto.</div>`
+            :`<div class="alerta-estrategica" style="background:#5c0d12;border-left-color:#f43f5e;padding:12px;">⚠️ <b>¡PELIGRO!</b> Te faltan S/ ${(fondoMus-efectivo).toFixed(2)} para el fondo de músicos.</div>`):'';
+    }
+    calcularPlanReskate();
+    renderizarDesgloseIngresosCategorias();
+}
+
+// ── DESGLOSE INGRESOS ──
+function renderizarDesgloseIngresosCategorias(){
+    const cats={'Calle':0,'Colegio Túpac Amaru':0,'La Revelación del Callao':0,'TLC Music Academia':0,'Trombón Sweet':0,'Otros':0};
+    const mesKey=hoy.substring(3);let totalBanda=0;
+    Object.keys(estado.ingresos).forEach(f=>{
+        (estado.ingresos[f]||[]).forEach(ing=>{
+            const cat=ing.categoria||'Otros';
+            if(cat==='La Revelación del Callao')totalBanda+=ing.precio;
+            if(f.substring(3)===mesKey){if(cats[cat]!==undefined)cats[cat]+=ing.precio;else cats['Otros']+=ing.precio;}
+        });
+    });
+    const emojis={'Calle':'🚌 Calle','Colegio Túpac Amaru':'🏫 Túpac Amaru','La Revelación del Callao':'🎺 La Revelación','TLC Music Academia':'🧠 TLC Academia','Trombón Sweet':'🎵 Trombón Sweet','Otros':'📦 Otros'};
+    let html='';Object.keys(cats).forEach(c=>{if(cats[c]>0)html+=`• <b>${emojis[c]}:</b> S/ ${cats[c].toFixed(2)}<br>`;});
+    const elBT=document.getElementById('banda-total-hoy');
+    const elBG=document.getElementById('banda-ganancia-hoy');
+    const elBM=document.getElementById('banda-musicos-hoy');
+    const elDes=document.getElementById('desglose-ingresos-categorias');
+    if(elBT)elBT.textContent=totalBanda.toFixed(2);
+    if(elBG)elBG.textContent=(totalBanda*0.30).toFixed(2);
+    if(elBM)elBM.textContent=(totalBanda*0.70).toFixed(2);
+    if(elDes)elDes.innerHTML=html||'No hay ingresos registrados en este mes.';
+}
+
+// ── PLAN RESKATE ──
+function calcularPlanReskate(){
+    const totalDeuda=estado.deudas.reduce((s,it)=>s+it.monto+(it.monto*(it.interes/100)),0);
+    const totalServ=estado.servicios.reduce((s,it)=>s+it.valor,0);
+    const ingHoy=(estado.ingresos[hoy]||[]).reduce((s,x)=>s+x.precio,0);
+    const mesKey=hoy.substring(3);
+    const hoyDate=new Date();
+    const hace30=new Date();hace30.setDate(hoyDate.getDate()-30);
+    const hace60=new Date();hace60.setDate(hoyDate.getDate()-60);
+    let totCat={'Alimento':0,'Ajuste por desbalance':0,'Gaseosas':0,'Transporte':0,'Aseo y Limpieza':0,'Servicios':0,'Salud':0,'Ropa':0,'Gustitos':0,'Otros':0};
+    let totMesAct=0,totMesPas=0,acumDesb=0;
+    const diasSet=new Set();
+    Object.keys(estado.gastos).forEach(f=>{
+        const lista=estado.gastos[f]||[];if(!lista.length)return;
+        diasSet.add(f); // CORRECCIÓN: todo el historial
+        const fObj=reconstruirFecha(f);
+        lista.forEach(g=>{
+            const cat=g.categoria||'Otros';
+            if(totCat[cat]!==undefined)totCat[cat]+=g.precio;
+            if(f.substring(3)===mesKey&&cat==='Ajuste por desbalance')acumDesb+=g.precio;
+            if(fObj>=hace30)totMesAct+=g.precio;
+            else if(fObj>=hace60&&fObj<hace30)totMesPas+=g.precio;
+        });
+    });
+    const dReal=diasSet.size||1;
+    const panelD=document.getElementById('box-alerta-desbalance-panel');
+    if(panelD){
+        panelD.className=acumDesb<=TOPE_DESBALANCE?'box-alerta-desbalance desbalance-ok':'box-alerta-desbalance desbalance-alerta';
+        panelD.innerHTML=acumDesb<=TOPE_DESBALANCE?`⚖️ Desbalance: S/ ${acumDesb.toFixed(2)} / S/ ${TOPE_DESBALANCE.toFixed(2)} [ OK ]`:`⚠️ ALERTA: Desbalance S/ ${acumDesb.toFixed(2)} superó S/ ${TOPE_DESBALANCE.toFixed(2)}`;
+    }
+    const emojisCat={'Alimento':'🍎 Alimento','Ajuste por desbalance':'⚖️ Desbalance','Gaseosas':'🥤 Gaseosas','Transporte':'🚌 Transporte','Aseo y Limpieza':'🧼 Aseo','Servicios':'⚡ Servicios','Salud':'💊 Salud','Ropa':'👕 Ropa','Gustitos':'☕ Gustitos','Otros':'📦 Otros'};
+    let desHTML='';let totalVarMens=0;
+    Object.keys(totCat).forEach(cat=>{
+        const est=(totCat[cat]/dReal)*30;totalVarMens+=est;
+        desHTML+=`• ${emojisCat[cat]}: <b>S/ ${totCat[cat].toFixed(2)}</b> | ~<b>S/ ${est.toFixed(2)}/mes</b><br>`;
+    });
+    const diasTrabajo=Math.ceil(plazoPlanSeleccionado*(5/7));
+    const objetivo=(totalDeuda/diasTrabajo)+(totalServ/21)+(totalVarMens/30);
+    let html=`<b>Deuda total indexada:</b> S/ ${totalDeuda.toFixed(2)}<br>`;
+    html+=`🎯 Meta en <b>${plazoPlanSeleccionado} días</b> (~${diasTrabajo} días de calle).<br>`;
+    html+=`<small style="color:var(--muted);">Base: <b>${dReal} días reales</b> con registros.</small><br>`;
+    html+=`<hr style="border:0;border-top:1px solid var(--border);margin:8px 0;">`;
+    html+=`📋 <b>Costo de Vida:</b><br>• 🏠 Fijos: S/ ${totalServ.toFixed(2)}/mes<br>${desHTML}`;
+    html+=`<hr style="border:0;border-top:1px solid var(--border);margin:8px 0;">`;
+    html+=`🚀 <b>INGRESO OBJETIVO HOY: S/ ${objetivo.toFixed(2)}</b>`;
+    const elAE=document.getElementById('analisis-estrategico');if(elAE)elAE.innerHTML=html;
+    const boxRec=document.getElementById('recomendacion-ingreso-real');if(!boxRec)return;
+    const costoOp=(totalServ/21)+(totalVarMens/30);
+    let msgV=ingHoy>0?(ingHoy-costoOp<=0
+        ?`<div class="alerta-estrategica">⚠️ Hoy S/ ${ingHoy.toFixed(2)} no cubre el costo operativo diario.</div>`
+        :`<div class="exito-estrategico">🚀 Sobrante: S/ ${(ingHoy-costoOp).toFixed(2)}/día → deuda en ~<b>${(totalDeuda/(ingHoy-costoOp)).toFixed(0)} días</b>.</div>`)
+        :`<p style="font-size:.78rem;color:var(--muted);text-align:center;margin-top:8px;">💡 Registrá ingresos para ver tu velocidad de salida.</p>`;
+    let msgH='';
+    if(totMesAct<totMesPas&&totMesAct>0)msgH+=`<div class="exito-estrategico" style="background:#1e1b4b;border-left-color:var(--accent);color:#f8fafc;margin-top:8px;">📈 Gastos reducidos en S/ ${(totMesPas-totMesAct).toFixed(2)} vs mes anterior.</div>`;
+    msgH+=totCat['Gaseosas']===0
+        ?`<div class="exito-estrategico" style="margin-top:8px;">🥤 ¡Sin gaseosas! Sigue firme.</div>`
+        :`<div class="alerta-estrategica" style="margin-top:8px;">🥤 Proyectás S/ ${((totCat['Gaseosas']/dReal)*30).toFixed(2)}/mes en gaseosas.</div>`;
+    boxRec.innerHTML=msgV+msgH;
+}
+
+function cambiarPlazoPlan(dias){
+    plazoPlanSeleccionado=dias;
+    document.querySelectorAll('.btn-plan').forEach(b=>b.classList.remove('active'));
+    document.getElementById(`btn-p${dias}`).classList.add('active');
+    calcularPlanReskate();
+}
+
+// ── SUGERENCIAS ──
+function buscarSugerencias(texto){
+    const box=document.getElementById('box-sugerencias-gasto');
+    if(!texto.trim()){box.style.display='none';return;}
+    const unicos=new Map();
+    Object.values(estado.gastos).forEach(l=>(l||[]).forEach(it=>{if(it.nombre)unicos.set(it.nombre.toLowerCase().trim(),{nombre:it.nombre,cat:it.categoria});}));
+    const fil=Array.from(unicos.values()).filter(it=>it.nombre.toLowerCase().includes(texto.toLowerCase()));
+    if(!fil.length){box.style.display='none';return;}
+    box.innerHTML=fil.slice(0,3).map(it=>`<div class="sugerencia-item" onclick="seleccionarSugerencia('${esc(it.nombre)}','${esc(it.cat)}')"><span>✍️ ${esc(it.nombre)}</span><small style="color:var(--accent);">[${esc(it.cat)}]</small></div>`).join('');
+    box.style.display='block';
+}
+function seleccionarSugerencia(nombre,categoria){
+    document.getElementById('nombre-gasto').value=nombre;
+    document.getElementById('select-categoria-gasto').value=categoria;
+    document.getElementById('box-sugerencias-gasto').style.display='none';
+}
+
+// ── LIMPIAR DÍAS ──
+function limpiarDiasEspecificos(){
+    if(!confirm('¿Eliminar datos de Gastos (Vie, Sáb, Dom) e Ingresos (Vie, Sáb)?'))return;
+    const hoyObj=new Date();
+    for(let i=0;i<=6;i++){
+        const d=new Date();d.setDate(hoyObj.getDate()-i);
+        const dia=d.getDay();
+        const fStr=d.toLocaleDateString('es-PE',{day:'2-digit',month:'2-digit',year:'numeric'});
+        if(dia===5||dia===6){delete estado.gastos[fStr];delete estado.ingresos[fStr];}
+        if(dia===0){delete estado.gastos[fStr];}
+    }
+    guardarFirebase();calcularSaldoAcumulado();renderizarSeccion('ingresos');renderizarSeccion('gastos');
+    toast('✅ Limpieza efectuada');
+}
+
+// ── RENDERIZAR SECCIÓN ──
+function renderizarSeccion(tipo){
+    const esIng=tipo==='ingresos';
+    const listaHoyId=esIng?'lista-ingresos-hoy':'lista-hoy';
+    const totalDiarioId=esIng?'total-ingresos-diario':'total-diario';
+    const contHisId=esIng?'contenedor-historial-ingresos':'contenedor-historial';
+    const boxAnualId=esIng?'total-anual-ingresos-box':'total-anual-gastos-box';
+    const anioActual=hoy.substring(6);
+    const transHoy=estado[tipo][hoy]||[];
+    const listaUl=document.getElementById(listaHoyId);
+    if(listaUl){
+        let totalHoy=0;const partes=[];
+        transHoy.forEach((t,i)=>{
+            totalHoy+=t.precio;
+            partes.push(`<li><span><b>${esc(t.nombre)}</b> <small style="color:var(--accent);">[${esc(t.categoria||'Otros')}]</small> — S/ ${t.precio.toFixed(2)}</span><button class="btn-del" onclick="borrarTransaccion('${tipo}','${hoy}',${i})">X</button></li>`);
+        });
+        listaUl.innerHTML=partes.join('');
+        const elTD=document.getElementById(totalDiarioId);if(elTD)elTD.textContent=totalHoy.toFixed(2);
+    }
+    const contHis=document.getElementById(contHisId);if(!contHis)return;
+    let meses={};let totalAnual=0;
+    Object.keys(estado[tipo]).forEach(f=>{
+        if(!f.includes('/'))return;
+        const mesKey=f.substring(3);if(!mesKey.includes('/'))return;
+        const items=estado[tipo][f]||[];
+        if(!meses[mesKey])meses[mesKey]=[];
+        meses[mesKey].push({fecha:f,items});
+        if(mesKey.endsWith('/'+anioActual))items.forEach(it=>totalAnual+=it.precio);
+    });
+    const mesesOrd=Object.keys(meses).sort((a,b)=>{
+        const[mA,aA]=a.split('/');const[mB,aB]=b.split('/');
+        return new Date(aB,mB-1)-new Date(aA,mA-1);
+    });
+    const bloques=[];
+    mesesOrd.forEach(mes=>{
+        const[m,a]=mes.split('/');
+        const nomMes=new Date(a,m-1,1).toLocaleString('es-ES',{month:'long'});
+        const dias=meses[mes].sort((x,y)=>reconstruirFecha(y.fecha)-reconstruirFecha(x.fecha));
+        const mesTotal=dias.reduce((s,d)=>s+d.items.reduce((ss,it)=>ss+it.precio,0),0);
+        const mesId=`mes_${tipo}_${mes.replace('/','_')}`;
+        const diasHTML=dias.map(d=>{
+            const diaTotal=d.items.reduce((s,it)=>s+it.precio,0);
+            const diaId=`dia_${tipo}_${d.fecha.replace(/\//g,'_')}`;
+            const itemsHTML=d.items.map((it,idx)=>
+                `<li><span><b>${esc(it.nombre)}</b> <small style="color:var(--accent);">[${esc(it.categoria||'Otros')}]</small></span>
+                <span style="display:flex;align-items:center;gap:4px;">S/ ${it.precio.toFixed(2)}
+                <button class="btn-del-historial" onclick="event.stopPropagation();borrarTransaccion('${tipo}','${d.fecha}',${idx})">X</button></span></li>`
+            ).join('');
+            let resumen='';
+            if(!esIng){const base=estado.saldos[d.fecha]||0;const totG=d.items.reduce((s,x)=>s+x.precio,0);
+                resumen=`<div class="cierre-resumen-box">📉 <b>Balance Caja:</b><br>• Base: S/ ${base.toFixed(2)} | Gastado: S/ ${totG.toFixed(2)}<br>💰 <b>Quedó: S/ ${(base-totG).toFixed(2)}</b></div>`;}
+            return`<div class="dia-item"><div class="dia-header-click" onclick="toggle('${diaId}')">
+                <span>${getDiaSemana(d.fecha).toUpperCase()} ${d.fecha} — <b>S/ ${diaTotal.toFixed(2)}</b></span>
+            </div><div id="${diaId}" class="detalle"><ul>${itemsHTML}</ul>${resumen}</div></div>`;
+        }).join('');
+        bloques.push(`<div class="mes-item" onclick="toggle('${mesId}')">${nomMes.charAt(0).toUpperCase()+nomMes.slice(1)} ${a} — S/ ${mesTotal.toFixed(2)}</div><div id="${mesId}" class="detalle">${diasHTML}</div>`);
+    });
+    contHis.innerHTML=bloques.join('')||'<p style="color:var(--muted);font-size:.83rem;">Sin registros.</p>';
+    const elAnual=document.getElementById(boxAnualId);
+    if(elAnual)elAnual.innerHTML=`📊 <b>Total ${esIng?'Ingresos':'Gastos'} ${anioActual}: S/ ${totalAnual.toFixed(2)}</b>`;
+}
+
+// ── RENDER TOTAL ──
+function renderizarTodo(){
+    inicializarSelectoresFecha();
+    calcularSaldoAcumulado();
+    renderizarSeccion('ingresos');
+    renderizarSeccion('gastos');
+    renderDeudas();
+    renderServicios();
+}
+
+// ── SERVICE WORKER ──
+if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('./sw.js').catch(e => console.warn('SW:', e));
+}
+
+// ── INICIO ──
+window.onload=function(){
+    document.getElementById('fecha-hoy').textContent=`${getDiaSemana(hoy).toUpperCase()} ${hoy}`;
+    inicializarSelectoresFecha();
+    cargarFirebase(); // solo después de esto se habilita el guardado
+};
+</script>
+</body>
+</html>
