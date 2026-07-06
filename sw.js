@@ -1,16 +1,15 @@
-const CACHE_NAME = 'presupuesto-personal-v1';
+const CACHE_NAME = 'presupuesto-personal-v2';
+
+// Solo cacheamos el HTML y el manifest, NO los datos
 const ARCHIVOS_CACHE = [
-    './presupuesto_personal.html',
-    './manifest.json',
-    './logo.png'
+    './index.html',
+    './manifest.json'
 ];
 
-// Instalación: guarda los archivos en caché
+// Instalación
 self.addEventListener('install', e => {
     e.waitUntil(
-        caches.open(CACHE_NAME).then(cache => {
-            return cache.addAll(ARCHIVOS_CACHE);
-        })
+        caches.open(CACHE_NAME).then(cache => cache.addAll(ARCHIVOS_CACHE))
     );
     self.skipWaiting();
 });
@@ -27,12 +26,21 @@ self.addEventListener('activate', e => {
     self.clients.claim();
 });
 
-// Fetch: si hay red úsala, si no usa caché
+// Fetch: siempre intenta la red primero
+// Solo usa caché si no hay conexión
 self.addEventListener('fetch', e => {
+    // Las llamadas a Firebase siempre van por red, nunca por caché
+    if (e.request.url.includes('firebase') ||
+        e.request.url.includes('firebaseio') ||
+        e.request.url.includes('googleapis')) {
+        e.respondWith(fetch(e.request));
+        return;
+    }
+
+    // Para el resto: red primero, caché como respaldo
     e.respondWith(
         fetch(e.request)
             .then(respuesta => {
-                // Guarda copia fresca en caché
                 const copia = respuesta.clone();
                 caches.open(CACHE_NAME).then(cache => cache.put(e.request, copia));
                 return respuesta;
