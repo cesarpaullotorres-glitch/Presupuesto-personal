@@ -290,14 +290,18 @@ let datosListos = false;
 // ── CONSTANTES ──
 let plazoPlanSeleccionado = 30;
 const TOPE_DESBALANCE = 20.00;
-const hoy = new Date().toLocaleDateString('es-PE',{day:'2-digit',month:'2-digit',year:'numeric'});
+// Fecha en formato DD-MM-AAAA (sin barras, compatible con Firebase)
+const _hoyDate = new Date();
+const hoy = String(_hoyDate.getDate()).padStart(2,'0') + '-' + 
+            String(_hoyDate.getMonth()+1).padStart(2,'0') + '-' + 
+            _hoyDate.getFullYear();
 
 // ── UTILIDADES ──
 function esc(s){return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
 function toast(msg,tipo='ok'){const t=document.getElementById('toast');t.textContent=msg;t.className=tipo==='error'?'error':'';t.style.display='block';setTimeout(()=>t.style.display='none',2500);}
 function setSync(msg){const el=document.getElementById('estado-sync');if(el)el.textContent=msg;}
-function getDiaSemana(f){if(!f)return'';const[d,m,a]=f.split('/');return new Date(a,m-1,d).toLocaleDateString('es-PE',{weekday:'short'}).replace('.','');}
-function reconstruirFecha(f){const[d,m,a]=f.split('/');return new Date(a,m-1,d);}
+function getDiaSemana(f){if(!f)return'';const[d,m,a]=f.split('-');return new Date(a,m-1,d).toLocaleDateString('es-PE',{weekday:'short'}).replace('.','');}
+function reconstruirFecha(f){const[d,m,a]=f.split('-');return new Date(a,m-1,d);}
 function toggle(id){const el=document.getElementById(id);if(el)el.style.display=el.style.display==='block'?'none':'block';}
 
 // ── FIREBASE: CARGAR ──
@@ -355,7 +359,7 @@ function inicializarSelectoresFecha(){
     const partes=[];
     for(let i=0;i<=5;i++){
         const d=new Date();d.setDate(d.getDate()-i);
-        const f=d.toLocaleDateString('es-PE',{day:'2-digit',month:'2-digit',year:'numeric'});
+        const f=String(d.getDate()).padStart(2,'0')+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+d.getFullYear();
         partes.push(`<option value="${f}">${i===0?'Hoy':f}</option>`);
     }
     document.querySelectorAll('.select-fecha-dinamico').forEach(s=>{s.innerHTML=partes.join('');s.value=hoy;});
@@ -376,7 +380,7 @@ function ejecutarRecalculoGeneral(){
     Object.keys(estado.gastos).forEach(f=>fs.add(f));
     Object.keys(estado.ingresos).forEach(f=>fs.add(f));
     Object.keys(estado.saldos).forEach(f=>fs.add(f));
-    const ord=Array.from(fs).filter(f=>f.includes('/')).sort((a,b)=>reconstruirFecha(a)-reconstruirFecha(b));
+    const ord=Array.from(fs).filter(f=>f.includes('-')&&f.length===10).sort((a,b)=>reconstruirFecha(a)-reconstruirFecha(b));
     let arr=0,primero=true;
     ord.forEach(f=>{
         const i=(estado.ingresos[f]||[]).reduce((s,x)=>s+x.precio,0);
@@ -646,14 +650,14 @@ function renderizarSeccion(tipo){
     let meses={};let totalAnual=0;
     Object.keys(estado[tipo]).forEach(f=>{
         if(!f.includes('/'))return;
-        const mesKey=f.substring(3);if(!mesKey.includes('/'))return;
+        const mesKey=f.substring(3);if(!mesKey.includes('-'))return;
         const items=estado[tipo][f]||[];
         if(!meses[mesKey])meses[mesKey]=[];
         meses[mesKey].push({fecha:f,items});
-        if(mesKey.endsWith('/'+anioActual))items.forEach(it=>totalAnual+=it.precio);
+        if(mesKey.endsWith('-'+anioActual))items.forEach(it=>totalAnual+=it.precio);
     });
     const mesesOrd=Object.keys(meses).sort((a,b)=>{
-        const[mA,aA]=a.split('/');const[mB,aB]=b.split('/');
+        const[mA,aA]=a.split('-');const[mB,aB]=b.split('-');
         return new Date(aB,mB-1)-new Date(aA,mA-1);
     });
     const bloques=[];
@@ -702,7 +706,8 @@ if ('serviceWorker' in navigator) {
 
 // ── INICIO ──
 window.onload=function(){
-    document.getElementById('fecha-hoy').textContent=`${getDiaSemana(hoy).toUpperCase()} ${hoy}`;
+    const [dH,mH,aH] = hoy.split('-');
+    document.getElementById('fecha-hoy').textContent=`${getDiaSemana(hoy).toUpperCase()} ${dH}/${mH}/${aH}`;
     inicializarSelectoresFecha();
     cargarFirebase(); // solo después de esto se habilita el guardado
 };
