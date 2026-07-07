@@ -203,6 +203,7 @@
                 <option value="Salud">💊 Salud</option>
                 <option value="Ropa">👕 Ropa y Calzado</option>
                 <option value="Gustitos">☕ Gustitos</option>
+                <option value="Gastos Tania">👩 Gastos Tania</option>
                 <option value="Otros">📦 Otros</option>
             </select>
             <label class="label-fecha">💵 Monto (S/):</label>
@@ -537,7 +538,7 @@ function calcularPlanReskate(){
     const hoyDate=new Date();
     const hace30=new Date();hace30.setDate(hoyDate.getDate()-30);
     const hace60=new Date();hace60.setDate(hoyDate.getDate()-60);
-    let totCat={'Alimento':0,'Ajuste por desbalance':0,'Gaseosas':0,'Transporte':0,'Aseo y Limpieza':0,'Servicios':0,'Salud':0,'Ropa':0,'Gustitos':0,'Otros':0};
+    let totCat={'Alimento':0,'Ajuste por desbalance':0,'Gaseosas':0,'Transporte':0,'Aseo y Limpieza':0,'Servicios':0,'Salud':0,'Ropa':0,'Gustitos':0,'Gastos Tania':0,'Otros':0};
     let totMesAct=0,totMesPas=0,acumDesb=0;
     const diasSet=new Set();
     Object.keys(estado.gastos).forEach(f=>{
@@ -558,7 +559,7 @@ function calcularPlanReskate(){
         panelD.className=acumDesb<=TOPE_DESBALANCE?'box-alerta-desbalance desbalance-ok':'box-alerta-desbalance desbalance-alerta';
         panelD.innerHTML=acumDesb<=TOPE_DESBALANCE?`⚖️ Desbalance: S/ ${acumDesb.toFixed(2)} / S/ ${TOPE_DESBALANCE.toFixed(2)} [ OK ]`:`⚠️ ALERTA: Desbalance S/ ${acumDesb.toFixed(2)} superó S/ ${TOPE_DESBALANCE.toFixed(2)}`;
     }
-    const emojisCat={'Alimento':'🍎 Alimento','Ajuste por desbalance':'⚖️ Desbalance','Gaseosas':'🥤 Gaseosas','Transporte':'🚌 Transporte','Aseo y Limpieza':'🧼 Aseo','Servicios':'⚡ Servicios','Salud':'💊 Salud','Ropa':'👕 Ropa','Gustitos':'☕ Gustitos','Otros':'📦 Otros'};
+    const emojisCat={'Alimento':'🍎 Alimento','Ajuste por desbalance':'⚖️ Desbalance','Gaseosas':'🥤 Gaseosas','Transporte':'🚌 Transporte','Aseo y Limpieza':'🧼 Aseo','Servicios':'⚡ Servicios','Salud':'💊 Salud','Ropa':'👕 Ropa','Gustitos':'☕ Gustitos','Gastos Tania':'👩 Gastos Tania','Otros':'📦 Otros'};
     let desHTML='';let totalVarMens=0;
     Object.keys(totCat).forEach(cat=>{
         const est=(totCat[cat]/dReal)*30;totalVarMens+=est;
@@ -649,8 +650,7 @@ function renderizarSeccion(tipo){
     const contHis=document.getElementById(contHisId);if(!contHis)return;
     let meses={};let totalAnual=0;
     Object.keys(estado[tipo]).forEach(f=>{
-        if(!f.includes('/'))return;
-        const mesKey=f.substring(3);if(!mesKey.includes('-'))return;
+        if(!f||f.length!==10)return;const pts=f.split('-');if(pts.length!==3)return;const mesKey=pts[1]+'-'+pts[2];
         const items=estado[tipo][f]||[];
         if(!meses[mesKey])meses[mesKey]=[];
         meses[mesKey].push({fecha:f,items});
@@ -662,14 +662,14 @@ function renderizarSeccion(tipo){
     });
     const bloques=[];
     mesesOrd.forEach(mes=>{
-        const[m,a]=mes.split('/');
+        const[m,a]=mes.split('-');
         const nomMes=new Date(a,m-1,1).toLocaleString('es-ES',{month:'long'});
         const dias=meses[mes].sort((x,y)=>reconstruirFecha(y.fecha)-reconstruirFecha(x.fecha));
         const mesTotal=dias.reduce((s,d)=>s+d.items.reduce((ss,it)=>ss+it.precio,0),0);
-        const mesId=`mes_${tipo}_${mes.replace('/','_')}`;
+        const mesId=`mes_${tipo}_${mes.replace('-','_')}`;
         const diasHTML=dias.map(d=>{
             const diaTotal=d.items.reduce((s,it)=>s+it.precio,0);
-            const diaId=`dia_${tipo}_${d.fecha.replace(/\//g,'_')}`;
+            const diaId=`dia_${tipo}_${d.fecha.replace(/-/g,'_')}`;
             const itemsHTML=d.items.map((it,idx)=>
                 `<li><span><b>${esc(it.nombre)}</b> <small style="color:var(--accent);">[${esc(it.categoria||'Otros')}]</small></span>
                 <span style="display:flex;align-items:center;gap:4px;">S/ ${it.precio.toFixed(2)}
