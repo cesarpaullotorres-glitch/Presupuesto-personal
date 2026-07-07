@@ -116,6 +116,22 @@
         .zona-peligro{border:2px dashed var(--red);border-radius:var(--rL);padding:14px;margin-top:28px;}
         .zona-peligro h3{color:var(--red);font-size:.95rem;margin-bottom:6px;}
         .zona-peligro p{font-size:.8rem;color:var(--muted);margin-bottom:10px;}
+
+        /* HISTORIAL MEJORADO */
+        .mes-detalle{display:none;margin-bottom:8px;}
+        .dia-detalle{display:none;padding:10px;background:var(--surface);font-size:.88rem;margin:4px 0 4px 16px;border-radius:6px;}
+        .btn-mover{background:#475569;color:white;border:none;padding:2px 6px;border-radius:4px;cursor:pointer;font-size:.75rem;margin-left:3px;}
+
+        /* MODAL EDITAR */
+        .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:500;display:none;align-items:center;justify-content:center;}
+        .modal-overlay.activo{display:flex;}
+        .modal-box{background:var(--surface);border:1px solid var(--border);border-radius:var(--rL);padding:20px;width:90%;max-width:380px;}
+        .modal-box h3{color:var(--accent);margin-bottom:12px;font-size:1rem;}
+        .modal-box select,.modal-box input{margin-bottom:10px;}
+        .modal-btns{display:flex;gap:8px;margin-top:4px;}
+        .modal-btns button{flex:1;padding:10px;border:none;border-radius:var(--r);font-weight:700;cursor:pointer;}
+        .btn-confirmar{background:var(--green);color:white;}
+        .btn-cancelar{background:#475569;color:white;}
     </style>
 </head>
 <body>
@@ -267,6 +283,43 @@
     </div>
 </div>
 
+<!-- MODAL EDITAR ITEM -->
+<div class="modal-overlay" id="modal-editar">
+    <div class="modal-box">
+        <h3>✏️ Editar item</h3>
+        <label class="label-fecha">Nombre:</label>
+        <input type="text" id="modal-nombre">
+        <label class="label-fecha">Categoría:</label>
+        <select id="modal-categoria-gastos">
+            <option value="Alimento">🍎 Alimento</option>
+            <option value="Ajuste por desbalance">⚖️ Ajuste por desbalance</option>
+            <option value="Gaseosas">🥤 Control Gaseosas/Azúcar</option>
+            <option value="Transporte">🚌 Transporte</option>
+            <option value="Aseo y Limpieza">🧼 Aseo y Limpieza</option>
+            <option value="Servicios">⚡ Servicios Fijos</option>
+            <option value="Salud">💊 Salud</option>
+            <option value="Ropa">👕 Ropa y Calzado</option>
+            <option value="Gustitos">☕ Gustitos</option>
+            <option value="Gastos Tania">👩 Gastos Tania</option>
+            <option value="Otros">📦 Otros</option>
+        </select>
+        <select id="modal-categoria-ingresos" style="display:none;">
+            <option value="Calle">🚌 Calle (Ingreso Diario / Ruta)</option>
+            <option value="Colegio Túpac Amaru">🏫 Colegio Túpac Amaru</option>
+            <option value="La Revelación del Callao">🎺 Banda Orquesta La Revelación</option>
+            <option value="TLC Music Academia">🧠 TLC Music Academia</option>
+            <option value="Trombón Sweet">🎵 Trombón Sweet</option>
+            <option value="Otros">📦 Otros Ingresos</option>
+        </select>
+        <label class="label-fecha">Monto (S/):</label>
+        <input type="number" step="0.01" id="modal-monto">
+        <div class="modal-btns">
+            <button class="btn-cancelar" onclick="cerrarModal()">Cancelar</button>
+            <button class="btn-confirmar" onclick="confirmarEdicion()">✅ Guardar</button>
+        </div>
+    </div>
+</div>
+
 <script>
 // ── FIREBASE ──
 const firebaseConfig = {
@@ -303,7 +356,61 @@ function toast(msg,tipo='ok'){const t=document.getElementById('toast');t.textCon
 function setSync(msg){const el=document.getElementById('estado-sync');if(el)el.textContent=msg;}
 function getDiaSemana(f){if(!f)return'';const[d,m,a]=f.split('-');return new Date(a,m-1,d).toLocaleDateString('es-PE',{weekday:'short'}).replace('.','');}
 function reconstruirFecha(f){const[d,m,a]=f.split('-');return new Date(a,m-1,d);}
-function toggle(id){const el=document.getElementById(id);if(el)el.style.display=el.style.display==='block'?'none':'block';}
+// Toggle que NO cierra los demás
+function toggle(id){
+    const el=document.getElementById(id);
+    if(el)el.style.display=el.style.display==='block'?'none':'block';
+}
+
+// Variables para edición
+let _editTipo='',_editFecha='',_editIdx=-1;
+
+function abrirModal(tipo,fecha,idx){
+    _editTipo=tipo;_editFecha=fecha;_editIdx=idx;
+    const it=estado[tipo][fecha][idx];
+    document.getElementById('modal-nombre').value=it.nombre;
+    document.getElementById('modal-monto').value=it.precio;
+    const selG=document.getElementById('modal-categoria-gastos');
+    const selI=document.getElementById('modal-categoria-ingresos');
+    if(tipo==='gastos'){
+        selG.style.display='';selI.style.display='none';selG.value=it.categoria||'Otros';
+    } else {
+        selG.style.display='none';selI.style.display='';selI.value=it.categoria||'Otros';
+    }
+    document.getElementById('modal-editar').classList.add('activo');
+}
+
+function cerrarModal(){
+    document.getElementById('modal-editar').classList.remove('activo');
+    _editTipo='';_editFecha='';_editIdx=-1;
+}
+
+function confirmarEdicion(){
+    if(_editIdx===-1)return;
+    const selG=document.getElementById('modal-categoria-gastos');
+    const selI=document.getElementById('modal-categoria-ingresos');
+    const cat=_editTipo==='gastos'?selG.value:selI.value;
+    const nombre=document.getElementById('modal-nombre').value.trim();
+    const precio=parseFloat(document.getElementById('modal-monto').value);
+    if(!nombre||isNaN(precio)){toast('Completá todos los campos','error');return;}
+    estado[_editTipo][_editFecha][_editIdx]={nombre,precio,categoria:cat};
+    guardarFirebase();
+    calcularSaldoAcumulado();
+    renderizarSeccion(_editTipo);
+    cerrarModal();
+    toast('✅ Actualizado');
+}
+
+function moverItem(tipo,fecha,idx,direccion){
+    const lista=estado[tipo][fecha];
+    if(!lista)return;
+    const nuevoIdx=idx+direccion;
+    if(nuevoIdx<0||nuevoIdx>=lista.length)return;
+    const temp=lista[idx];lista[idx]=lista[nuevoIdx];lista[nuevoIdx]=temp;
+    guardarFirebase();
+    renderizarSeccion(tipo);
+    calcularSaldoAcumulado();
+}
 
 // ── FIREBASE: CARGAR ──
 function cargarFirebase(){
@@ -671,9 +778,15 @@ function renderizarSeccion(tipo){
             const diaTotal=d.items.reduce((s,it)=>s+it.precio,0);
             const diaId=`dia_${tipo}_${d.fecha.replace(/-/g,'_')}`;
             const itemsHTML=d.items.map((it,idx)=>
-                `<li><span><b>${esc(it.nombre)}</b> <small style="color:var(--accent);">[${esc(it.categoria||'Otros')}]</small></span>
-                <span style="display:flex;align-items:center;gap:4px;">S/ ${it.precio.toFixed(2)}
-                <button class="btn-del-historial" onclick="event.stopPropagation();borrarTransaccion('${tipo}','${d.fecha}',${idx})">X</button></span></li>`
+                `<li style="flex-wrap:wrap;gap:4px;">
+                    <span style="flex:1;"><b>${esc(it.nombre)}</b> <small style="color:var(--accent);">[${esc(it.categoria||'Otros')}]</small> — S/ ${it.precio.toFixed(2)}</span>
+                    <span style="display:flex;gap:3px;flex-shrink:0;">
+                        <button class="btn-mover" onclick="event.stopPropagation();moverItem('${tipo}','${d.fecha}',${idx},-1)" title="Subir">↑</button>
+                        <button class="btn-mover" onclick="event.stopPropagation();moverItem('${tipo}','${d.fecha}',${idx},1)" title="Bajar">↓</button>
+                        <button class="btn-del-historial" style="background:#3b82f6;" onclick="event.stopPropagation();abrirModal('${tipo}','${d.fecha}',${idx})">✏️</button>
+                        <button class="btn-del-historial" onclick="event.stopPropagation();borrarTransaccion('${tipo}','${d.fecha}',${idx})">X</button>
+                    </span>
+                </li>`
             ).join('');
             let resumen='';
             if(!esIng){const base=estado.saldos[d.fecha]||0;const totG=d.items.reduce((s,x)=>s+x.precio,0);
