@@ -325,13 +325,14 @@ function cargarFirebase(){
 
 // ── FIREBASE: GUARDAR ──
 async function guardarFirebase(){
-    if(!datosListos) return; // protección principal
+    if(!datosListos){toast('⏳ Esperando Firebase...','error');return;}
     try{
         await ref.set(estado);
         setSync('✅ Sincronizado');
     }catch(e){
-        setSync('❌ Error al guardar');
-        toast('Error: '+e.message,'error');
+        setSync('❌ '+e.message);
+        toast('❌ Error: '+e.message,'error');
+        console.error('Firebase error:',e);
     }
 }
 
