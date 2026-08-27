@@ -163,14 +163,14 @@
             <label class="label-fecha">✏️ Detalle del ingreso:</label>
             <input type="text" id="nombre-ingreso" placeholder="¿De dónde vino el dinero?">
             <label class="label-fecha">🏷️ Origen:</label>
-            <select id="select-categoria-ingreso">
-                <option value="Calle">🚌 Calle (Ingreso Diario / Ruta)</option>
-                <option value="Colegio Túpac Amaru">🏫 Colegio Túpac Amaru</option>
-                <option value="La Revelación del Callao">🎺 Banda Orquesta La Revelación</option>
-                <option value="TLC Music Academia">🧠 TLC Music Academia</option>
-                <option value="Trombón Sweet">🎵 Trombón Sweet</option>
-                <option value="Otros">📦 Otros Ingresos</option>
-            </select>
+            <select id="select-categoria-ingreso"></select>
+            <button type="button" class="btn-mantenimiento" style="margin-bottom:10px;" onclick="toggle('panel-gestion-origenes')">⚙️ Gestionar Orígenes</button>
+            <div id="panel-gestion-origenes" style="display:none;margin-bottom:10px;padding:10px;border:1px dashed var(--border);border-radius:var(--r);">
+                <label class="label-fecha">➕ Nuevo origen:</label>
+                <input type="text" id="nuevo-origen-nombre" placeholder="Ej: Colegio Regina Pacis">
+                <button type="button" class="btn-add" onclick="agregarCategoriaIngreso()">Agregar Origen</button>
+                <div id="lista-gestion-origenes" style="margin-top:10px;font-size:.85rem;"></div>
+            </div>
             <label class="label-fecha">💵 Monto (S/):</label>
             <input type="number" step="0.01" id="precio-ingreso" placeholder="0.00">
             <label class="label-fecha">Asignar al día:</label>
@@ -303,14 +303,7 @@
             <option value="Gastos Tania">👩 Gastos Tania</option>
             <option value="Otros">📦 Otros</option>
         </select>
-        <select id="modal-categoria-ingresos" style="display:none;">
-            <option value="Calle">🚌 Calle (Ingreso Diario / Ruta)</option>
-            <option value="Colegio Túpac Amaru">🏫 Colegio Túpac Amaru</option>
-            <option value="La Revelación del Callao">🎺 Banda Orquesta La Revelación</option>
-            <option value="TLC Music Academia">🧠 TLC Music Academia</option>
-            <option value="Trombón Sweet">🎵 Trombón Sweet</option>
-            <option value="Otros">📦 Otros Ingresos</option>
-        </select>
+        <select id="modal-categoria-ingresos" style="display:none;"></select>
         <label class="label-fecha">Monto (S/):</label>
         <input type="number" step="0.01" id="modal-monto">
         <div class="modal-btns">
@@ -336,7 +329,15 @@ const db  = firebase.database();
 const ref = db.ref('app_presupuesto_personal');
 
 // ── ESTADO ──
-let estado = { ingresos:{}, gastos:{}, saldos:{}, deudas:[], servicios:[] };
+const CATEGORIAS_INGRESO_DEFECTO = [
+    {valor:'Calle', etiqueta:'🚌 Calle (Ingreso Diario / Ruta)'},
+    {valor:'Colegio Túpac Amaru', etiqueta:'🏫 Colegio Túpac Amaru'},
+    {valor:'La Revelación del Callao', etiqueta:'🎺 Banda Orquesta La Revelación'},
+    {valor:'TLC Music Academia', etiqueta:'🧠 TLC Music Academia'},
+    {valor:'Trombón Sweet', etiqueta:'🎵 Trombón Sweet'},
+    {valor:'Otros', etiqueta:'📦 Otros Ingresos'}
+];
+let estado = { ingresos:{}, gastos:{}, saldos:{}, deudas:[], servicios:[], categoriasIngresos:JSON.parse(JSON.stringify(CATEGORIAS_INGRESO_DEFECTO)) };
 
 // ── BANDERA CRÍTICA: bloquea guardar hasta que Firebase responda ──
 let datosListos = false;
@@ -423,6 +424,7 @@ function cargarFirebase(){
         estado.saldos    = (d&&d.saldos)    ? d.saldos    : {};
         estado.deudas    = (d&&d.deudas)    ? d.deudas    : [];
         estado.servicios = (d&&d.servicios) ? d.servicios : [];
+        estado.categoriasIngresos = (d&&d.categoriasIngresos&&d.categoriasIngresos.length) ? d.categoriasIngresos : JSON.parse(JSON.stringify(CATEGORIAS_INGRESO_DEFECTO));
         // ── Recién aquí se habilita el guardado ──
         datosListos = true;
         setSync('✅ Sincronizado');
@@ -576,7 +578,7 @@ function renderServicios(){
 async function reiniciarTodo(){
     if(!confirm('⚠️ ¿Borrar TODO? Ingresos, gastos, deudas y servicios.\nNo se puede deshacer.'))return;
     if(!confirm('🔴 Confirmación final: ¿Estás completamente seguro?'))return;
-    estado={ingresos:{},gastos:{},saldos:{},deudas:[],servicios:[]};
+    estado={ingresos:{},gastos:{},saldos:{},deudas:[],servicios:[],categoriasIngresos:estado.categoriasIngresos};
     await guardarFirebase();renderizarTodo();toast('✅ Todo reiniciado');
 }
 async function reiniciarSoloMovimientos(){
@@ -613,19 +615,67 @@ function calcularSaldoAcumulado(){
     renderizarDesgloseIngresosCategorias();
 }
 
+// ── ORÍGENES DE INGRESO (editables) ──
+function renderizarSelectsCategoriaIngreso(){
+    const cats=estado.categoriasIngresos||CATEGORIAS_INGRESO_DEFECTO;
+    const opts=cats.map(c=>`<option value="${esc(c.valor)}">${esc(c.etiqueta)}</option>`).join('');
+    ['select-categoria-ingreso','modal-categoria-ingresos'].forEach(id=>{
+        const el=document.getElementById(id);
+        if(!el)return;
+        const valorPrevio=el.value;
+        el.innerHTML=opts;
+        if(cats.some(c=>c.valor===valorPrevio))el.value=valorPrevio;
+    });
+    renderizarGestionOrigenes();
+}
+function renderizarGestionOrigenes(){
+    const cont=document.getElementById('lista-gestion-origenes');
+    if(!cont)return;
+    const cats=estado.categoriasIngresos||CATEGORIAS_INGRESO_DEFECTO;
+    cont.innerHTML=cats.map((c,i)=>
+        `<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;">
+            <span>${esc(c.etiqueta)}</span>
+            ${c.valor==='Otros'?'':`<button class="btn-del" onclick="borrarCategoriaIngreso(${i})">X</button>`}
+         </div>`
+    ).join('');
+}
+function agregarCategoriaIngreso(){
+    const input=document.getElementById('nuevo-origen-nombre');
+    const nombre=input.value.trim();
+    if(!nombre){toast('Escribí un nombre para el origen','error');return;}
+    const cats=estado.categoriasIngresos||(estado.categoriasIngresos=JSON.parse(JSON.stringify(CATEGORIAS_INGRESO_DEFECTO)));
+    if(cats.some(c=>c.valor.toLowerCase()===nombre.toLowerCase())){toast('Ese origen ya existe','error');return;}
+    cats.push({valor:nombre, etiqueta:'📌 '+nombre});
+    guardarFirebase();
+    renderizarSelectsCategoriaIngreso();
+    input.value='';
+    toast('✅ Origen agregado');
+}
+function borrarCategoriaIngreso(idx){
+    const cats=estado.categoriasIngresos;
+    if(!cats||!cats[idx])return;
+    if(!confirm(`¿Quitar "${cats[idx].etiqueta}" del menú? Los ingresos ya registrados con este origen se conservan en el historial.`))return;
+    cats.splice(idx,1);
+    guardarFirebase();
+    renderizarSelectsCategoriaIngreso();
+    toast('✅ Origen quitado del menú');
+}
+
 // ── DESGLOSE INGRESOS ──
 function renderizarDesgloseIngresosCategorias(){
-    const cats={'Calle':0,'Colegio Túpac Amaru':0,'La Revelación del Callao':0,'TLC Music Academia':0,'Trombón Sweet':0,'Otros':0};
+    const cats={};
+    const etiquetas={};
+    (estado.categoriasIngresos||CATEGORIAS_INGRESO_DEFECTO).forEach(c=>{cats[c.valor]=0;etiquetas[c.valor]=c.etiqueta;});
     const mesKey=hoy.substring(3);let totalBanda=0;
     Object.keys(estado.ingresos).forEach(f=>{
         (estado.ingresos[f]||[]).forEach(ing=>{
             const cat=ing.categoria||'Otros';
             if(cat==='La Revelación del Callao')totalBanda+=ing.precio;
-            if(f.substring(3)===mesKey){if(cats[cat]!==undefined)cats[cat]+=ing.precio;else cats['Otros']+=ing.precio;}
+            if(cats[cat]===undefined){cats[cat]=0;etiquetas[cat]='📌 '+cat;}
+            if(f.substring(3)===mesKey)cats[cat]+=ing.precio;
         });
     });
-    const emojis={'Calle':'🚌 Calle','Colegio Túpac Amaru':'🏫 Túpac Amaru','La Revelación del Callao':'🎺 La Revelación','TLC Music Academia':'🧠 TLC Academia','Trombón Sweet':'🎵 Trombón Sweet','Otros':'📦 Otros'};
-    let html='';Object.keys(cats).forEach(c=>{if(cats[c]>0)html+=`• <b>${emojis[c]}:</b> S/ ${cats[c].toFixed(2)}<br>`;});
+    let html='';Object.keys(cats).forEach(c=>{if(cats[c]>0)html+=`• <b>${esc(etiquetas[c])}:</b> S/ ${cats[c].toFixed(2)}<br>`;});
     const elBT=document.getElementById('banda-total-hoy');
     const elBG=document.getElementById('banda-ganancia-hoy');
     const elBM=document.getElementById('banda-musicos-hoy');
@@ -805,6 +855,7 @@ function renderizarSeccion(tipo){
 // ── RENDER TOTAL ──
 function renderizarTodo(){
     inicializarSelectoresFecha();
+    renderizarSelectsCategoriaIngreso();
     calcularSaldoAcumulado();
     renderizarSeccion('ingresos');
     renderizarSeccion('gastos');
