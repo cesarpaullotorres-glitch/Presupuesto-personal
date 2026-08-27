@@ -323,7 +323,7 @@
 <script>
 // ── FIREBASE ──
 const firebaseConfig = {
-    apiKey:"AIzaSySyBhf6dRmAzRjORmGLKnJHfzelt01I",
+    apiKey:"AIzaSyBhf6dRmAzRjORmGLKnJHfzeltO1IJJC3M",
     authDomain:"presupuestopararevelacion.firebaseapp.com",
     databaseURL:"https://presupuestopararevelacion-default-rtdb.firebaseio.com",
     projectId:"presupuestopararevelacion",
@@ -727,7 +727,7 @@ function limpiarDiasEspecificos(){
     for(let i=0;i<=6;i++){
         const d=new Date();d.setDate(hoyObj.getDate()-i);
         const dia=d.getDay();
-        const fStr=d.toLocaleDateString('es-PE',{day:'2-digit',month:'2-digit',year:'numeric'});
+        const fStr=String(d.getDate()).padStart(2,'0')+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+d.getFullYear();
         if(dia===5||dia===6){delete estado.gastos[fStr];delete estado.ingresos[fStr];}
         if(dia===0){delete estado.gastos[fStr];}
     }
