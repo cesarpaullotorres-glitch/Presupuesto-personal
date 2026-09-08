@@ -413,10 +413,10 @@ function moverItem(tipo,fecha,idx,direccion){
     calcularSaldoAcumulado();
 }
 
-// ── FIREBASE: CARGAR ──
+// ── FIREBASE: CARGAR (una sola vez al abrir, para evitar que ecos de red pisen datos recientes) ──
 function cargarFirebase(){
     setSync('🔄 Conectando...');
-    ref.on('value', snap => {
+    ref.once('value').then(snap => {
         const d = snap.val();
         // Cargamos lo que hay (o vacío si es null) — NUNCA pisamos con el estado inicial vacío
         estado.ingresos  = (d&&d.ingresos)  ? d.ingresos  : {};
@@ -430,7 +430,7 @@ function cargarFirebase(){
         setSync('✅ Sincronizado');
         ocultarSplash();
         renderizarTodo();
-    }, () => {
+    }).catch(() => {
         setSync('❌ Sin conexión');
         ocultarSplash();
         toast('Sin conexión a Firebase','error');
